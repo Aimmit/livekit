@@ -14,9 +14,19 @@
 
 FROM golang:1.24-alpine AS builder
 
-ARG TARGETPLATFORM
-ARG TARGETARCH
-RUN echo building for "$TARGETPLATFORM"
+LABEL stage=gobuilder
+
+ENV CGO_ENABLED 0
+ENV GOOS linux
+ENV GOPROXY https://goproxy.cn,direct
+ENV HTTP_PROXY http://192.168.16.148:7890
+ENV HTTPS_PROXY http://192.168.16.148:7890
+RUN echo "nameserver 223.6.6.6" > /etc/resolv.conf
+RUN apk update --no-cache && apk add --no-cache tzdata
+
+# ARG TARGETPLATFORM
+# ARG TARGETARCH
+# RUN echo building for "$TARGETPLATFORM"
 
 WORKDIR /workspace
 
@@ -34,7 +44,7 @@ COPY test/ test/
 COPY tools/ tools/
 COPY version/ version/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -a -o livekit-server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -a -o livekit-server ./cmd/server
 
 FROM alpine
 
