@@ -1193,6 +1193,16 @@ func (r *Room) onTrackPublished(participant types.LocalParticipant, track types.
 			continue
 		}
 
+		claims := existingParticipant.ClaimGrants()
+		if claims == nil || claims.Video == nil {
+			continue
+		}
+
+		if (!claims.Video.RoomAdmin || r.Name() != livekit.RoomName(claims.Video.Room)) && track.Kind() != livekit.TrackType_AUDIO {
+			// only subscribe to audio tracks if not admin
+			continue
+		}
+
 		r.logger.Debugw("subscribing to new track",
 			"participant", existingParticipant.Identity(),
 			"pID", existingParticipant.ID(),
@@ -1300,6 +1310,11 @@ func (r *Room) subscribeToExistingTracks(p types.LocalParticipant) {
 		return
 	}
 
+	claims := p.ClaimGrants()
+	if claims == nil || claims.Video == nil {
+		return
+	}
+
 	var trackIDs []livekit.TrackID
 	for _, op := range r.GetParticipants() {
 		if p.ID() == op.ID() {
@@ -1309,6 +1324,10 @@ func (r *Room) subscribeToExistingTracks(p types.LocalParticipant) {
 
 		// subscribe to all
 		for _, track := range op.GetPublishedTracks() {
+			if (!claims.Video.RoomAdmin || r.Name() != livekit.RoomName(claims.Video.Room)) && track.Kind() != livekit.TrackType_AUDIO {
+				// only subscribe to audio tracks if not admin
+				continue
+			}
 			trackIDs = append(trackIDs, track.ID())
 			p.SubscribeToTrack(track.ID())
 		}
