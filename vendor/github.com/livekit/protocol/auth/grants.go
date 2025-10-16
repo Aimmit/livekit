@@ -15,6 +15,7 @@
 package auth
 
 import (
+	"errors"
 	"maps"
 	"strings"
 
@@ -33,6 +34,8 @@ var tokenMarshaler = protojson.MarshalOptions{
 	EmitDefaultValues: false,
 }
 
+var ErrSensitiveCredentials = errors.New("room configuration should not contain sensitive credentials")
+
 func (c *RoomConfiguration) Clone() *RoomConfiguration {
 	if c == nil {
 		return nil
@@ -48,13 +51,125 @@ func (c *RoomConfiguration) UnmarshalJSON(data []byte) error {
 	return protojson.Unmarshal(data, (*livekit.RoomConfiguration)(c))
 }
 
+// CheckCredentials checks if the room configuration contains sensitive credentials
+// and returns an error if it does.
+//
+// This is used to prevent sensitive credentials from being leaked to the client.
+// It is not used to validate the credentials themselves, as that is done by the
+// egress service.
+func (c *RoomConfiguration) CheckCredentials() error {
+	if c.Egress == nil {
+		return nil
+	}
+
+	if c.Egress.Participant != nil {
+		for _, output := range c.Egress.Participant.FileOutputs {
+			if err := checkOutputForCredentials(output.Output); err != nil {
+				return err
+			}
+		}
+		for _, output := range c.Egress.Participant.SegmentOutputs {
+			if err := checkOutputForCredentials(output.Output); err != nil {
+				return err
+			}
+		}
+	}
+	if c.Egress.Room != nil {
+		for _, output := range c.Egress.Room.FileOutputs {
+			if err := checkOutputForCredentials(output.Output); err != nil {
+				return err
+			}
+		}
+		for _, output := range c.Egress.Room.SegmentOutputs {
+			if err := checkOutputForCredentials(output.Output); err != nil {
+				return err
+			}
+		}
+		for _, output := range c.Egress.Room.ImageOutputs {
+			if err := checkOutputForCredentials(output.Output); err != nil {
+				return err
+			}
+		}
+		if len(c.Egress.Room.StreamOutputs) > 0 {
+			// do not leak stream key
+			return ErrSensitiveCredentials
+		}
+	}
+	if c.Egress.Tracks != nil {
+		if err := checkOutputForCredentials(c.Egress.Tracks.Output); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkOutputForCredentials(output any) error {
+	if output == nil {
+		return nil
+	}
+
+	switch msg := output.(type) {
+	case *livekit.EncodedFileOutput_S3:
+		if msg.S3.Secret != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.SegmentedFileOutput_S3:
+		if msg.S3.Secret != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.AutoTrackEgress_S3:
+		if msg.S3.Secret != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.EncodedFileOutput_Gcp:
+		if msg.Gcp.Credentials != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.SegmentedFileOutput_Gcp:
+		if msg.Gcp.Credentials != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.AutoTrackEgress_Gcp:
+		if msg.Gcp.Credentials != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.EncodedFileOutput_Azure:
+		if msg.Azure.AccountKey != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.SegmentedFileOutput_Azure:
+		if msg.Azure.AccountKey != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.AutoTrackEgress_Azure:
+		if msg.Azure.AccountKey != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.EncodedFileOutput_AliOSS:
+		if msg.AliOSS.Secret != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.SegmentedFileOutput_AliOSS:
+		if msg.AliOSS.Secret != "" {
+			return ErrSensitiveCredentials
+		}
+	case *livekit.AutoTrackEgress_AliOSS:
+		if msg.AliOSS.Secret != "" {
+			return ErrSensitiveCredentials
+		}
+	}
+	return nil
+}
+
 type ClaimGrants struct {
-	Identity string      `json:"-"`
-	Name     string      `json:"name,omitempty"`
-	Kind     string      `json:"kind,omitempty"`
-	Video    *VideoGrant `json:"video,omitempty"`
-	SIP      *SIPGrant   `json:"sip,omitempty"`
-	Agent    *AgentGrant `json:"agent,omitempty"`
+	Identity      string              `json:"identity,omitempty"`
+	Name          string              `json:"name,omitempty"`
+	Kind          string              `json:"kind,omitempty"`
+	Video         *VideoGrant         `json:"video,omitempty"`
+	SIP           *SIPGrant           `json:"sip,omitempty"`
+	Agent         *AgentGrant         `json:"agent,omitempty"`
+	Inference     *InferenceGrant     `json:"inference,omitempty"`
+	Observability *ObservabilityGrant `json:"observability,omitempty"`
 	// Room configuration to use if this participant initiates the room
 	RoomConfig *RoomConfiguration `json:"roomConfig,omitempty"`
 	// Cloud-only, config preset to use
@@ -90,6 +205,9 @@ func (c *ClaimGrants) Clone() *ClaimGrants {
 	clone := *c
 	clone.Video = c.Video.Clone()
 	clone.SIP = c.SIP.Clone()
+	clone.Agent = c.Agent.Clone()
+	clone.Inference = c.Inference.Clone()
+	clone.Observability = c.Observability.Clone()
 	clone.Attributes = maps.Clone(c.Attributes)
 	clone.RoomConfig = c.RoomConfig.Clone()
 
@@ -105,6 +223,9 @@ func (c *ClaimGrants) MarshalLogObject(e zapcore.ObjectEncoder) error {
 	e.AddString("Kind", c.Kind)
 	e.AddObject("Video", c.Video)
 	e.AddObject("SIP", c.SIP)
+	e.AddObject("Agent", c.Agent)
+	e.AddObject("Inference", c.Inference)
+	e.AddObject("Observability", c.Observability)
 	e.AddObject("RoomConfig", logger.Proto((*livekit.RoomConfiguration)(c.RoomConfig)))
 	e.AddString("RoomPreset", c.RoomPreset)
 	return nil
@@ -436,6 +557,58 @@ func (s *AgentGrant) MarshalLogObject(e zapcore.ObjectEncoder) error {
 	}
 
 	e.AddBool("Admin", s.Admin)
+	return nil
+}
+
+// ------------------------------------------------------------------
+
+type InferenceGrant struct {
+	// Perform grants to all inference features (LLM, STT, TTS)
+	Perform bool `json:"perform,omitempty"`
+}
+
+func (s *InferenceGrant) Clone() *InferenceGrant {
+	if s == nil {
+		return nil
+	}
+
+	clone := *s
+
+	return &clone
+}
+
+func (s *InferenceGrant) MarshalLogObject(e zapcore.ObjectEncoder) error {
+	if s == nil {
+		return nil
+	}
+
+	e.AddBool("Perform", s.Perform)
+	return nil
+}
+
+// ------------------------------------------------------------------
+
+type ObservabilityGrant struct {
+	// Write grants to publish observability data
+	Write bool `json:"write,omitempty"`
+}
+
+func (s *ObservabilityGrant) Clone() *ObservabilityGrant {
+	if s == nil {
+		return nil
+	}
+
+	clone := *s
+
+	return &clone
+}
+
+func (s *ObservabilityGrant) MarshalLogObject(e zapcore.ObjectEncoder) error {
+	if s == nil {
+		return nil
+	}
+
+	e.AddBool("Write", s.Write)
 	return nil
 }
 

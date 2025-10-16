@@ -95,6 +95,23 @@ func (p *SIPStatus) TwirpErrorMeta() map[string]string {
 	}
 }
 
+// Name returns a lower-case short name for the transport.
+// It returns an empty string if transport is not specified.
+func (p SIPTransport) Name() string {
+	switch p {
+	case SIPTransport_SIP_TRANSPORT_AUTO:
+		return ""
+	case SIPTransport_SIP_TRANSPORT_UDP:
+		return "udp"
+	case SIPTransport_SIP_TRANSPORT_TCP:
+		return "tcp"
+	case SIPTransport_SIP_TRANSPORT_TLS:
+		return "tls"
+	default:
+		return strings.TrimPrefix(p.String(), "SIP_TRANSPORT_")
+	}
+}
+
 // ToProto implements DataPacket in Go SDK.
 func (p *SipDTMF) ToProto() *DataPacket {
 	return &DataPacket{
@@ -658,6 +675,16 @@ func (p *CreateSIPParticipantRequest) Validate() error {
 	if err := validateHeaderKeys(p.Headers); err != nil {
 		return err
 	}
+
+	// Validate display_name if provided
+	if p.DisplayName != nil {
+		if len(*p.DisplayName) > 128 {
+			return errors.New("display_name too long (max 128 characters)")
+		}
+
+		// TODO: Validate display name doesn't contain invalid characters
+	}
+
 	return nil
 }
 
@@ -671,6 +698,33 @@ func (p *TransferSIPParticipantRequest) Validate() error {
 	if p.TransferTo == "" {
 		return errors.New("missing transfer to")
 	}
+
+	// Validate TransferTo URI format and ensure RFC compliance
+	var innerURI string
+	if strings.HasPrefix(p.TransferTo, "<") && strings.HasSuffix(p.TransferTo, ">") {
+		// Extract inner URI for validation
+		innerURI = p.TransferTo[1 : len(p.TransferTo)-1]
+	} else {
+		innerURI = p.TransferTo
+	}
+
+	if !strings.HasPrefix(innerURI, "sip:") && !strings.HasPrefix(innerURI, "tel:") {
+		// In theory the Refer-To header can receive the full name-addr.
+		// This can make this check inaccurate, but we want to limit to just SIP and TEL URIs.
+		return errors.New("transfer_to must be a valid SIP or TEL URI (sip: or tel:)")
+	}
+
+	if strings.HasPrefix(innerURI, "sip:") {
+		// addr-spec = sip:...
+		// name-addr = [ display-name ] <addr-spec>
+		// Both name-addr and addr-spec are allowed in RFC3515 (section-2.1).
+		// However, name-addr is more premissive and widely-supported, so we convert.
+		p.TransferTo = fmt.Sprintf("<%s>", innerURI)
+	} else {
+		// tel: URIs are not explicitly allowed in spec, but are generally supported.
+		p.TransferTo = innerURI
+	}
+
 	if err := validateHeaderKeys(p.Headers); err != nil {
 		return err
 	}
@@ -723,6 +777,16 @@ func (p *ListSIPInboundTrunkRequest) Filter(info *SIPInboundTrunkInfo) bool {
 		for _, num := range info.Numbers {
 			if slices.Contains(p.Numbers, num) {
 				ok = true
+				break
+			}
+			normalizedNum := NormalizeNumber(num)
+			for _, reqNum := range p.Numbers {
+				if NormalizeNumber(reqNum) == normalizedNum {
+					ok = true
+					break
+				}
+			}
+			if ok {
 				break
 			}
 		}
@@ -797,3 +861,30 @@ func (p *ListSIPDispatchRuleRequest) FilterSlice(arr []*SIPDispatchRuleInfo) []*
 	})
 	return filterSlice(arr, p.Filter)
 }
+
+// NormalizeNumber normalizes a phone number by removing formatting characters and ensuring it starts with a "+".
+// If the input is empty, it returns an empty string.
+// If the input doesn't match the expected number pattern, it returns the original input unchanged.
+func NormalizeNumber(num string) string {
+	if num == "" {
+		return ""
+	}
+	if !reNumber.MatchString(num) {
+		return num
+	}
+	num = reNumberRepl.Replace(num)
+	if !strings.HasPrefix(num, "+") {
+		return "+" + num
+	}
+	return num
+}
+
+var (
+	reNumber     = regexp.MustCompile(`^\+?[\d\- ()]+$`)
+	reNumberRepl = strings.NewReplacer(
+		" ", "",
+		"-", "",
+		"(", "",
+		")", "",
+	)
+)

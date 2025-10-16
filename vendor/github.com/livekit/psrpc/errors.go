@@ -32,6 +32,7 @@ var (
 	ErrRequestCanceled = NewErrorf(Canceled, "request canceled")
 	ErrRequestTimedOut = NewErrorf(DeadlineExceeded, "request timed out")
 	ErrNoResponse      = NewErrorf(Unavailable, "no response from servers")
+	ErrUnimplemented   = NewErrorf(Unimplemented, "method is not implemented")
 	ErrStreamEOF       = NewError(Unavailable, io.EOF)
 	ErrClientClosed    = NewErrorf(Canceled, "client is closed")
 	ErrServerClosed    = NewErrorf(Canceled, "server is closed")
@@ -84,9 +85,22 @@ func (e ErrorCode) ToHTTP() int {
 		return http.StatusServiceUnavailable
 	case Unauthenticated:
 		return http.StatusUnauthorized
+	case UnprocessableEntity:
+		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+func GetErrorCode(err error) (ErrorCode, bool) {
+	var e Error
+	if errors.As(err, &e) {
+		return e.Code(), true
+	}
+	if st, ok := status.FromError(err); ok && st != nil {
+		return ErrorCodeFromGRPC(st.Code()), true
+	}
+	return Unknown, false
 }
 
 func ErrorCodeFromGRPC(code codes.Code) ErrorCode {
@@ -292,6 +306,8 @@ const (
 	DataLoss ErrorCode = "data_loss"
 	// Similar to PermissionDenied, used when the caller is unidentified
 	Unauthenticated ErrorCode = "unauthenticated"
+	// Cannot consume the entity in the given format
+	UnprocessableEntity ErrorCode = "unprocessable_entity"
 )
 
 type psrpcError struct {
