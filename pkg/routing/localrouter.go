@@ -16,7 +16,6 @@ package routing
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"go.uber.org/atomic"
@@ -35,7 +34,6 @@ type LocalRouter struct {
 	roomManagerClient RoomManagerClient
 	nodeStatsConfig   config.NodeStatsConfig
 
-	lock sync.RWMutex
 	// channels for each participant
 	requestChannels  map[string]*MessageChannel
 	responseChannels map[string]*MessageChannel
@@ -110,7 +108,8 @@ func (r *LocalRouter) StartParticipantSignal(ctx context.Context, roomName livek
 func (r *LocalRouter) StartParticipantSignalWithNodeID(ctx context.Context, roomName livekit.RoomName, pi ParticipantInit, nodeID livekit.NodeID) (res StartParticipantSignalResults, err error) {
 	connectionID, reqSink, resSource, err := r.signalClient.StartParticipantSignal(ctx, roomName, pi, nodeID)
 	if err != nil {
-		logger.Errorw("could not handle new participant", err,
+		logger.Errorw(
+			"could not handle new participant", err,
 			"room", roomName,
 			"participant", pi.Identity,
 			"connID", connectionID,

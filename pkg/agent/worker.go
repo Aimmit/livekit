@@ -43,6 +43,8 @@ var (
 	ErrDuplicateJobAssignment     = errors.New("duplicate job assignment")
 )
 
+const AgentNameAttributeKey = "lk.agent_name"
+
 type WorkerProtocolVersion int
 
 const CurrentProtocol = 1
@@ -141,6 +143,7 @@ type WorkerRegistration struct {
 	Protocol    WorkerProtocolVersion
 	ID          string
 	Version     string
+	AgentID     string
 	AgentName   string
 	Namespace   string
 	JobType     livekit.JobType
@@ -343,6 +346,8 @@ func (w *Worker) AssignJob(ctx context.Context, job *livekit.Job) (*livekit.JobS
 		job.State = &livekit.JobState{}
 	}
 	now := time.Now()
+	job.State.WorkerId = w.ID
+	job.State.AgentId = w.AgentID
 	job.State.UpdatedAt = now.UnixNano()
 	job.State.StartedAt = now.UnixNano()
 	job.State.Status = livekit.JobStatus_JS_RUNNING
@@ -357,11 +362,22 @@ func (w *Worker) AssignJob(ctx context.Context, job *livekit.Job) (*livekit.JobS
 	// See handleAvailability for the response
 	select {
 	case res := <-availCh:
+		if res.Terminate {
+			job.State.EndedAt = now.UnixNano()
+			job.State.Status = livekit.JobStatus_JS_SUCCESS
+			return job.State, nil
+		}
+
 		if !res.Available {
 			return nil, ErrWorkerNotAvailable
 		}
 
 		job.State.ParticipantIdentity = res.ParticipantIdentity
+		attributes := res.ParticipantAttributes
+		if attributes == nil {
+			attributes = make(map[string]string)
+		}
+		attributes[AgentNameAttributeKey] = w.AgentName
 
 		token, err := pagent.BuildAgentToken(
 			w.apiKey,
@@ -370,7 +386,7 @@ func (w *Worker) AssignJob(ctx context.Context, job *livekit.Job) (*livekit.JobS
 			res.ParticipantIdentity,
 			res.ParticipantName,
 			res.ParticipantMetadata,
-			res.ParticipantAttributes,
+			attributes,
 			w.Permissions,
 		)
 		if err != nil {

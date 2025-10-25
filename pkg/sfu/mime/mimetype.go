@@ -18,6 +18,8 @@ import (
 	"strings"
 
 	"github.com/pion/webrtc/v4"
+
+	"github.com/livekit/protocol/observability/roomobs"
 )
 
 const (
@@ -79,6 +81,41 @@ func (m MimeTypeCodec) String() string {
 	return "MimeTypeCodecUnknown"
 }
 
+func (m MimeTypeCodec) ToMimeType() MimeType {
+	switch m {
+	case MimeTypeCodecUnknown:
+		return MimeTypeUnknown
+	case MimeTypeCodecH264:
+		return MimeTypeH264
+	case MimeTypeCodecH265:
+		return MimeTypeH265
+	case MimeTypeCodecOpus:
+		return MimeTypeOpus
+	case MimeTypeCodecRED:
+		return MimeTypeRED
+	case MimeTypeCodecVP8:
+		return MimeTypeVP8
+	case MimeTypeCodecVP9:
+		return MimeTypeVP9
+	case MimeTypeCodecAV1:
+		return MimeTypeAV1
+	case MimeTypeCodecG722:
+		return MimeTypeG722
+	case MimeTypeCodecPCMU:
+		return MimeTypePCMU
+	case MimeTypeCodecPCMA:
+		return MimeTypePCMA
+	case MimeTypeCodecRTX:
+		return MimeTypeRTX
+	case MimeTypeCodecFlexFEC:
+		return MimeTypeFlexFEC
+	case MimeTypeCodecULPFEC:
+		return MimeTypeULPFEC
+	}
+
+	return MimeTypeUnknown
+}
+
 func NormalizeMimeTypeCodec(codec string) MimeTypeCodec {
 	switch {
 	case strings.EqualFold(codec, "h264"):
@@ -127,6 +164,14 @@ func IsMimeTypeCodecStringOpus(codec string) bool {
 
 func IsMimeTypeCodecStringRED(codec string) bool {
 	return NormalizeMimeTypeCodec(codec) == MimeTypeCodecRED
+}
+
+func IsMimeTypeCodecStringPCMA(codec string) bool {
+	return NormalizeMimeTypeCodec(codec) == MimeTypeCodecPCMA
+}
+
+func IsMimeTypeCodecStringPCMU(codec string) bool {
+	return NormalizeMimeTypeCodec(codec) == MimeTypeCodecPCMU
 }
 
 func IsMimeTypeCodecStringH264(codec string) bool {
@@ -187,6 +232,41 @@ func (m MimeType) String() string {
 	return "MimeTypeUnknown"
 }
 
+func (m MimeType) ReporterType() roomobs.MimeType {
+	switch m {
+	case MimeTypeUnknown:
+		return roomobs.MimeTypeUndefined
+	case MimeTypeH264:
+		return roomobs.MimeTypeVideoH264
+	case MimeTypeH265:
+		return roomobs.MimeTypeVideoH265
+	case MimeTypeOpus:
+		return roomobs.MimeTypeAudioOpus
+	case MimeTypeRED:
+		return roomobs.MimeTypeAudioRed
+	case MimeTypeVP8:
+		return roomobs.MimeTypeVideoVp8
+	case MimeTypeVP9:
+		return roomobs.MimeTypeVideoVp9
+	case MimeTypeAV1:
+		return roomobs.MimeTypeVideoAv1
+	case MimeTypeG722:
+		return roomobs.MimeTypeAudioG722
+	case MimeTypePCMU:
+		return roomobs.MimeTypeAudioPcmu
+	case MimeTypePCMA:
+		return roomobs.MimeTypeAudioPcma
+	case MimeTypeRTX:
+		return roomobs.MimeTypeVideoRtx
+	case MimeTypeFlexFEC:
+		return roomobs.MimeTypeVideoFlexfec
+	case MimeTypeULPFEC:
+		return roomobs.MimeTypeVideoUlpfec
+	}
+
+	return roomobs.MimeTypeUndefined
+}
+
 func NormalizeMimeType(mime string) MimeType {
 	switch {
 	case strings.EqualFold(mime, webrtc.MimeTypeH264):
@@ -240,11 +320,7 @@ func IsMimeTypeVideo(mimeType MimeType) bool {
 	return strings.HasPrefix(mimeType.String(), MimeTypePrefixVideo)
 }
 
-// SVC-TODO: Have to use more conditions to differentiate between
-// SVC-TODO: SVC and non-SVC (could be single layer or simulcast).
-// SVC-TODO: May only need to differentiate between simulcast and non-simulcast
-// SVC-TODO: i. e. may be possible to treat single layer as SVC to get proper/intended functionality.
-func IsMimeTypeSVC(mimeType MimeType) bool {
+func IsMimeTypeSVCCapable(mimeType MimeType) bool {
 	switch mimeType {
 	case MimeTypeAV1, MimeTypeVP9:
 		return true
@@ -252,8 +328,8 @@ func IsMimeTypeSVC(mimeType MimeType) bool {
 	return false
 }
 
-func IsMimeTypeStringSVC(mime string) bool {
-	return IsMimeTypeSVC(NormalizeMimeType(mime))
+func IsMimeTypeStringSVCCapable(mime string) bool {
+	return IsMimeTypeSVCCapable(NormalizeMimeType(mime))
 }
 
 func IsMimeTypeStringRED(mime string) bool {
@@ -262,6 +338,14 @@ func IsMimeTypeStringRED(mime string) bool {
 
 func IsMimeTypeStringOpus(mime string) bool {
 	return NormalizeMimeType(mime) == MimeTypeOpus
+}
+
+func IsMimeTypeStringPCMA(mime string) bool {
+	return NormalizeMimeType(mime) == MimeTypePCMA
+}
+
+func IsMimeTypeStringPCMU(mime string) bool {
+	return NormalizeMimeType(mime) == MimeTypePCMU
 }
 
 func IsMimeTypeStringRTX(mime string) bool {
