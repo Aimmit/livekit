@@ -229,7 +229,7 @@ github.com/livekit/mediatransportutil/pkg/nack
 github.com/livekit/mediatransportutil/pkg/rtcconfig
 github.com/livekit/mediatransportutil/pkg/transport
 github.com/livekit/mediatransportutil/pkg/twcc
-# github.com/livekit/protocol v1.39.1-0.20250604205715-2227c44329ee => github.com/Aimmit/protocol v0.0.0-20251016090235-e55b2799dfa5
+# github.com/livekit/protocol v1.39.1-0.20250604205715-2227c44329ee => github.com/Aimmit/protocol v0.0.0-20251024094044-eb1337b2f638
 ## explicit; go 1.23.0
 github.com/livekit/protocol/agent
 github.com/livekit/protocol/auth
@@ -830,4 +830,4 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# github.com/livekit/protocol => github.com/Aimmit/protocol v0.0.0-20251016090235-e55b2799dfa5
+# github.com/livekit/protocol => github.com/Aimmit/protocol v0.0.0-20251024094044-eb1337b2f638

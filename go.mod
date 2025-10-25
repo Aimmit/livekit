@@ -150,4 +150,4 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/livekit/protocol => github.com/Aimmit/protocol v0.0.0-20251016090235-e55b2799dfa5
+replace github.com/livekit/protocol => github.com/Aimmit/protocol v0.0.0-20251024094044-eb1337b2f638

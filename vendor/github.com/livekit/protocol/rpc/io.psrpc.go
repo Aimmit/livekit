@@ -12,10 +12,13 @@ import (
 	"github.com/livekit/psrpc/pkg/rand"
 	"github.com/livekit/psrpc/pkg/server"
 	"github.com/livekit/psrpc/version"
+
+	google_protobuf "google.golang.org/protobuf/types/known/emptypb"
+
+	livekit4 "github.com/livekit/protocol/livekit"
+
+	livekit5 "github.com/livekit/protocol/livekit"
 )
-import google_protobuf "google.golang.org/protobuf/types/known/emptypb"
-import livekit4 "github.com/livekit/protocol/livekit"
-import livekit5 "github.com/livekit/protocol/livekit"
 
 var _ = version.PsrpcVersion_0_7
 
