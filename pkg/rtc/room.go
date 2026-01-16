@@ -1128,16 +1128,6 @@ func (r *Room) onTrackPublished(participant types.LocalParticipant, track types.
 			continue
 		}
 
-		claims := existingParticipant.ClaimGrants()
-		if claims == nil || claims.Video == nil {
-			continue
-		}
-
-		if (!claims.Video.RoomAdmin || r.Name() != livekit.RoomName(claims.Video.Room)) && track.Kind() != livekit.TrackType_AUDIO {
-			// only subscribe to audio tracks if not admin
-			continue
-		}
-
 		existingParticipant.GetLogger().Debugw(
 			"subscribing to new track",
 			"publisher", participant.Identity(),
